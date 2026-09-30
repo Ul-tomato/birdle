@@ -315,6 +315,9 @@
   <script>
     // 游戏配置 - 词库JSON文件路径
     const LIBRARIES_JSON = 'word_libraries.json';  // 与HTML文件同目录
+    // 个人鸟库：单独一个文件，方便随时自己改；文件不存在也不影响游戏
+    const PERSONAL_JSON = 'personal_bird_libraries.json';
+    const PERSONAL_LIBNAME = '个人鸟库';   // 顶层写成数组时使用的词库名
     let WORD_LENGTH = 0;
     const MAX_VISIBLE_ROWS = 5;
 
@@ -354,16 +357,33 @@
       loadingIndicator.classList.remove('hidden');
       noLibrariesFound.classList.add('hidden');
 
-      // 从JSON文件加载词库
-      fetch(LIBRARIES_JSON)
-        .then(response => {
+      // 从JSON文件加载词库（官方词库 + 个人鸟库）
+      Promise.all([
+        fetch(LIBRARIES_JSON).then(response => {
           if (!response.ok) {
             throw new Error('词库文件未找到');
           }
           return response.json();
-        })
-        .then(data => {
+        }),
+        // 个人鸟库：缺失或格式错误都当作没有，不影响官方词库
+        fetch(PERSONAL_JSON)
+          .then(response => response.ok ? response.json() : null)
+          .catch(() => null)
+      ])
+        .then(([data, personal]) => {
           allLibraries = data;
+          // 追加个人词库：数组 => 一个「个人鸟库」；对象 => 按 key 变成多个词库
+          if (personal && typeof personal === 'object') {
+            const extra = Array.isArray(personal)
+              ? { [PERSONAL_LIBNAME]: personal }
+              : personal;
+            Object.keys(extra).forEach(name => {
+              const list = extra[name];
+              if (Array.isArray(list) && list.length > 0) {
+                allLibraries[name] = list;
+              }
+            });
+          }
           loadingIndicator.classList.add('hidden');
 
           // 获取所有词库名称
